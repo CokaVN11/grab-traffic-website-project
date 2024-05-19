@@ -4,6 +4,7 @@ import sys
 import traceback
 from flask_restful import Resource
 from flask import request
+import time
 from datetime import datetime, timedelta
 from app.utils.database import place_latlong, data_summary
 from app.utils.calculator import calculate_aqi, try_read
@@ -37,8 +38,10 @@ class RankingBase(Resource):
 
     def sort_and_rank(self, locations, key):
         sorted_locations = sorted(locations, key=lambda d: d[key])
-        for i, location in enumerate(sorted_locations):
-            location["rank"] = i + 1
+        [
+            location.update({"rank": i + 1})
+            for i, location in enumerate(sorted_locations)
+        ]
         return sorted_locations
 
     def create_response(self, option, count, rankings):
@@ -88,16 +91,25 @@ class RankingBase(Resource):
 class RankingCurrent(RankingBase):
     def post(self):
         option = request.form.get("option", "both")
-        locations = place_latlong.find(
-            projection={
-                "id": 1,
-                "place": 1,
-                "traffic_data": {"$slice": 1},
-                "air_data": {"$slice": 1},
-            }
-        )
-        locations_traffic, locations_air = [], []
+        
+        cached_locations = self.get_cached_data("locations_traffic_air")
+        if cached_locations:
+            locations = cached_locations
+        else: 
+            pipeline = [
+                {
+                    "$project": {
+                        "id": 1,
+                        "place": 1,
+                        "traffic_data": {"$slice": ["$traffic_data", 1]},
+                        "air_data": {"$slice": ["$air_data", 1]},
+                    }
+                },
+            ]
 
+            locations = list(place_latlong.aggregate(pipeline))
+            self.cache_data("locations_traffic_air", locations)
+        locations_traffic, locations_air = [], []
         for location in locations:
             traffic_index, air_index = self.get_location_data(location)
             locations_traffic.append(
@@ -119,7 +131,9 @@ class RankingCurrent(RankingBase):
             rankings = self.sort_and_rank(locations_traffic, "traffic_quality_index")
             return self.create_response("traffic", len(rankings), rankings)
         elif option == "air":
+
             rankings = self.sort_and_rank(locations_air, "air_quality_index")
+
             return self.create_response("air", len(rankings), rankings)
         else:
             traffic_rankings = self.sort_and_rank(
@@ -142,65 +156,70 @@ class RankingDaily(RankingBase):
         yesterday = str((datetime.strptime(today, "%Y-%m-%d") - timedelta(1)).date())
 
         traffic_ranking, air_ranking, change_ranking = [], [], []
+        cached_key = f"data_daily_traffic_air_{today}"
+        cached_data = self.get_cached_data(cached_key)
+        if cached_data is None:
+            projection = {
+                "_id": 0,
+                "id": 1,
+                "place": 1,
+                today: {
+                    "traffic_summary": 1,
+                    "traffic_count": 1,
+                    "air_summary": 1,
+                    "air_count": 1,
+                },
+                yesterday: {
+                    "traffic_summary": 1,
+                    "traffic_count": 1,
+                    "air_summary": 1,
+                    "air_count": 1,
+                },
+            }
 
-        projection = {
-            "_id": 0,
-            "id": 1,
-            "place": 1,
-            today: {
-                "traffic_summary": 1,
-                "traffic_count": 1,
-                "air_summary": 1,
-                "air_count": 1,
-            },
-            yesterday: {
-                "traffic_summary": 1,
-                "traffic_count": 1,
-                "air_summary": 1,
-                "air_count": 1,
-            },
-        }
+            for data_piece in data_summary.find({}, projection):
+                try:
+                    avg_traffic, compared_traffic = self.calculate_average(
+                        data_piece, today, yesterday, "traffic"
+                    )
+                    avg_air, compared_air = self.calculate_average(
+                        data_piece, today, yesterday, "air"
+                    )
 
-        for data_piece in data_summary.find({}, projection):
-            try:
-                avg_traffic, compared_traffic = self.calculate_average(
-                    data_piece, today, yesterday, "traffic"
-                )
-                avg_air, compared_air = self.calculate_average(
-                    data_piece, today, yesterday, "air"
-                )
+                    traffic_ranking.append(
+                        {
+                            "id": data_piece["id"],
+                            "name": data_piece["place"],
+                            "traffic_quality_index": avg_traffic,
+                        }
+                    )
+                    air_ranking.append(
+                        {
+                            "id": data_piece["id"],
+                            "name": data_piece["place"],
+                            "air_quality_index": avg_air,
+                        }
+                    )
+                    change_ranking.append(
+                        {
+                            "id": data_piece["id"],
+                            "name": data_piece["place"],
+                            "change_index": (
+                                (avg_air / compared_air)
+                                + (avg_traffic / compared_traffic)
+                                - 1
+                            )
+                            * (-100)
+                            / 2,
+                        }
+                    )
+                except Exception as e:
+                    print(f"Error processing data piece: {e}")
+                    continue
 
-                traffic_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "traffic_quality_index": avg_traffic,
-                    }
-                )
-                air_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "air_quality_index": avg_air,
-                    }
-                )
-                change_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "change_index": (
-                            (avg_air / compared_air)
-                            + (avg_traffic / compared_traffic)
-                            - 1
-                        )
-                        * (-100)
-                        / 2,
-                    }
-                )
-            except Exception as e:
-                print(f"Error processing data piece: {e}")
-                continue
-
+            self.cache_data(cached_key, [traffic_ranking, air_ranking, change_ranking])
+        else:
+            traffic_ranking, air_ranking, change_ranking = cached_data
         if option == "traffic":
             rankings = self.sort_and_rank(traffic_ranking, "traffic_quality_index")
             return self.create_response("traffic", len(rankings), rankings)
@@ -256,92 +275,147 @@ class RankingWeekly(RankingBase):
         if not rankings:
             return {"error": "data not found"}
 
-        rankings = self.sort_and_rank(
-            rankings,
-            (
-                f"{ranking_type}_quality_index"
-                if ranking_type != "change"
-                else "change_index"
-            ),
-        )
+        # rankings = self.sort_and_rank(
+        #     rankings,
+        #     (
+        #         f"{ranking_type}_quality_index"
+        #         if ranking_type != "change"
+        #         else "change_index"
+        #     ),
+        # )
         response = self.create_response(ranking_type, len(rankings), rankings)
         self.cache_data(cache_key, response)
         return response
 
     def calculate_weekly_traffic(self, today):
-        traffic_ranking = []
         projection = self.get_weekly_projection(today)
-
-        for data_piece in data_summary.find({}, projection):
-            try:
-                avg_traffic = self.calculate_weekly_average(
-                    data_piece, today, "traffic_summary"
-                )
-                traffic_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "traffic_quality_index": avg_traffic,
+        pipeline = [
+            {"$match": {}},
+            {"$project": projection},
+            {
+                "$addFields": {
+                    "avg_traffic": {
+                        "$avg": {
+                            "$map": {
+                                "input": {"$range": [0, 7]},
+                                "as": "day",
+                                "in": {
+                                    "$avg": f"${{date_subtract('day', '$$day', '{today}')}}.traffic_summary"
+                                },
+                            }
+                        }
                     }
-                )
-            except Exception as e:
-                print(f"Error: {e.with_traceback(sys.exc_info()[2])}")
-                continue
-        return traffic_ranking
+                }
+            },
+            {
+                "$project": {
+                    "id": 1,
+                    "place": 1,
+                    "traffic_quality_index": "$avg_traffic",
+                }
+            },
+            {"$sort": {"traffic_quality_index": 1}},
+        ]
+        print(pipeline)
+        return list(data_summary.aggregate(pipeline))
 
     def calculate_weekly_air(self, today):
-        air_ranking = []
         projection = self.get_weekly_projection(today)
-
-        for data_piece in data_summary.find({}, projection):
-            try:
-                avg_air = self.calculate_weekly_average(
-                    data_piece, today, "air_summary"
-                )
-                print(data_piece)
-                air_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "air_quality_index": avg_air,
+        pipeline = [
+            {"$match": {}},
+            {"$project": projection},
+            {
+                "$addFields": {
+                    "avg_air": {
+                        "$avg": {
+                            "$map": {
+                                "input": {"$range": [0, 7]},
+                                "as": "day",
+                                "in": {
+                                    "$avg": f"${{date_subtract('day', '$$day', '{today}')}}.air_summary"
+                                },
+                            }
+                        }
                     }
-                )
-            except Exception:
-                print(f"Error: {traceback.format_exc()}")
-                continue
-        return air_ranking
+                }
+            },
+            {"$project": {"id": 1, "place": 1, "air_quality_index": "$avg_air"}},
+            {"$sort": {"air_quality_index": 1}},
+        ]
+        return list(data_summary.aggregate(pipeline))
 
     def calculate_weekly_change(self, today):
-        change_ranking = []
         projection = self.get_weekly_projection(today)
-
-        for data_piece in data_summary.find({}, projection):
-            try:
-                avg_air = self.calculate_weekly_average(
-                    data_piece, today, "air_summary"
-                )
-                avg_traffic = self.calculate_weekly_average(
-                    data_piece, today, "traffic_summary"
-                )
-                compared_air = statistics.mean(
-                    data_piece[str((today - timedelta(6)).date())]["air_summary"]
-                )
-                compared_traffic = statistics.mean(
-                    data_piece[str((today - timedelta(6)).date())]["traffic_summary"]
-                )
-                change = (
-                    ((avg_air / compared_air) + (avg_traffic / compared_traffic) - 1)
-                    * (-100)
-                    / 2
-                )
-                change_ranking.append(
-                    {
-                        "id": data_piece["id"],
-                        "name": data_piece["place"],
-                        "change_index": change,
+        pipeline = [
+            {"$match": {}},
+            {"$project": projection},
+            {
+                "$addFields": {
+                    "avg_traffic": {
+                        "$avg": {
+                            "$map": {
+                                "input": {"$range": [0, 7]},
+                                "as": "day",
+                                "in": {
+                                    "$avg": f"${{date_subtract('day', '$$day', '{today}')}}.traffic_summary"
+                                },
+                            }
+                        }
+                    },
+                    "avg_air": {
+                        "$avg": {
+                            "$map": {
+                                "input": {"$range": [0, 7]},
+                                "as": "day",
+                                "in": {
+                                    "$avg": f"${{date_subtract('day', '$$day', '{today}')}}.air_summary"
+                                },
+                            }
+                        }
+                    },
+                    "compared_traffic": {
+                        "$avg": f"${{date_subtract('day', 6, '{today}')}}.traffic_summary"
+                    },
+                    "compared_air": {
+                        "$avg": f"${{date_subtract('day', 6, '{today}')}}.air_summary"
+                    },
+                }
+            },
+            {
+                "$addFields": {
+                    "change_index": {
+                        "$multiply": [
+                            {
+                                "$divide": [
+                                    {
+                                        "$subtract": [
+                                            {
+                                                "$add": [
+                                                    {
+                                                        "$divide": [
+                                                            "$avg_traffic",
+                                                            "$compared_traffic",
+                                                        ]
+                                                    },
+                                                    {
+                                                        "$divide": [
+                                                            "$avg_air",
+                                                            "$compared_air",
+                                                        ]
+                                                    },
+                                                ]
+                                            },
+                                            2,
+                                        ]
+                                    },
+                                    -100,
+                                ]
+                            }
+                        ]
                     }
-                )
-            except Exception as e:
-                print(f"Error: {e.with_traceback(sys.exc_info()[2])}")
-                continue
-        return change_ranking
+                }
+            },
+            {"$project": {"id": 1, "place": 1, "change_index": 1}},
+            {"$sort": {"change_index": 1}},
+        ]
+        return list(data_summary.aggregate(pipeline))

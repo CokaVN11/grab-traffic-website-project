@@ -83,23 +83,36 @@ class DataBase(Resource):
             "nh3": future_data["air_data"][0]["nh3"],
         }
 
-    def get_weekly_data(self, location_id, date, date_keys):
-        return data_summary.find_one(
-            {"id": location_id},
-            {**{"id": 1, "place": 1}, **{date_key: 1 for date_key in date_keys}},
-        )
-
     def get_range_data(self, location_id, date_keys):
-        query_dict = {"id": 1, "place": 1}
-        for date_key in date_keys:
-            query_dict[date_key] = 1
-        return data_summary.find_one({"id": location_id}, query_dict)
+        pipeline = [
+            {"$match": {"id": location_id}},
+            {
+                "$project": {
+                    "id": 1,
+                    "place": 1,
+                    **{
+                        date_key: {
+                            "traffic_summary": {"$slice": ["$" + date_key + ".traffic_summary", 24]},
+                            "air_summary": {"$slice": ["$" + date_key + ".air_summary", 24]},
+                        }
+                        for date_key in date_keys
+                    },
+                }
+            },
+        ]
+        return data_summary.aggregate(pipeline).next()
 
     def get_future_summary_data(self, location_id):
-        return future_summary.find_one(
-            {"id": location_id},
-            {"traffic_data": {"$slice": 1}, "air_data": {"$slice": 1}},
-        )
+        pipeline = [
+            {"$match": {"id": location_id}},
+            {
+                "$project": {
+                    "traffic_data": {"$slice": ["$traffic_data", 1]},
+                    "air_data": {"$slice": ["$air_data", 1]},
+                }
+            },
+        ]
+        return future_summary.aggregate(pipeline).next()
 
     def calculate_range_data(self, location, date_keys):
         data_day = []
@@ -125,7 +138,9 @@ class DataBase(Resource):
 
 class DataCurrent(DataBase):
     def get(self, id):
-        location = place_latlong.find_one({"id": id})
+        location = place_latlong.find_one(
+            {"id": id}, {"traffic_data": {"$slice": 1}, "air_data": {"$slice": 1}}
+        )
         traffic_data, air_data = location["traffic_data"][0], location["air_data"][0]
         traffic_data["traffic_quality_index"] = calculate_traffic_index_from_dict(
             traffic_data
@@ -189,14 +204,23 @@ class DataDaily(DataBase):
 
     def prepare_data(self, location_id, date_str, average=True):
         location = data_summary.find_one(
-            {"id": location_id}, {"id": 1, "place": 1, date_str: 1}
+            {"id": location_id},
+            {
+                "id": 1,
+                "place": 1,
+                date_str: {
+                    "traffic_summary": {"$slice": [0, 24]},
+                    "air_summary": {"$slice": [0, 24]},
+                },
+            },
         )
         average_traffic, average_air = None, None
         if average:
             average_traffic = statistics.mean(location[date_str]["traffic_summary"])
             average_air = statistics.mean(location[date_str]["air_summary"])
         future_data = future_summary.find_one(
-            {"id": location_id}, {"traffic_data": 1, "air_data": 1}
+            {"id": location_id},
+            {"traffic_data": {"$slice": [0, 24]}, "air_data": {"$slice": [0, 24]}},
         )
         return location, average_traffic, average_air, future_data
 
@@ -259,7 +283,7 @@ class DataWeekly(DataBase):
             return {"error": "Date must be in range today and before"}
 
         date_keys = self.generate_date_keys(date, 7)
-        location = self.get_weekly_data(location_id, date, date_keys)
+        location = self.get_range_data(location_id, date_keys)
         if not location:
             return {"error": "Location not found"}
 

@@ -9,7 +9,6 @@ def connect_to_mongo():
     Establish a connection to the MongoDB server and return the client object.
     """
     try:
-        print(MONGO_URI)
         client = MongoClient(MONGO_URI, server_api=ServerApi("1"))
         client.admin.command("ping")
         logging.info("Successfully connected to MongoDB!")
