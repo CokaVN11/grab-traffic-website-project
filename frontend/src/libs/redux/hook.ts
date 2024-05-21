@@ -30,6 +30,10 @@ export const useInitLocationData = () => {
     }
 
     fetchMapLocationData()
+
+    const intervalId = setInterval(fetchMapLocationData, 30000)
+
+    return () => clearInterval(intervalId)
   }, [dispatch, locationService])
 }
 
