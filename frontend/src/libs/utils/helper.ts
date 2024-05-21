@@ -11,9 +11,8 @@ export const translateColor = (color: string, portion: number): string => {
     color = color.slice(1)
   }
 
-  const newR = Math.floor(parseInt(color.slice(0, 2), 16) * (1 + portion))
-  const newG = Math.floor(parseInt(color.slice(2, 4), 16) * (1 + portion))
-  const newB = Math.floor(parseInt(color.slice(4, 6), 16) * (1 + portion))
-
+  const newR = Math.min(Math.floor(parseInt(color.slice(0, 2), 16) * (1 + portion)), 255)
+  const newG = Math.min(Math.floor(parseInt(color.slice(2, 4), 16) * (1 + portion)), 255)
+  const newB = Math.min(Math.floor(parseInt(color.slice(4, 6), 16) * (1 + portion)), 255)
   return `#${newR.toString(16).padStart(2, '0')}${newG.toString(16).padStart(2, '0')}${newB.toString(16).padStart(2, '0')}`
 }

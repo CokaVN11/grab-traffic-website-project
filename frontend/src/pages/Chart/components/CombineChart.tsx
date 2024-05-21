@@ -13,14 +13,14 @@ import {
   ChartOptions,
   ChartData
 } from 'chart.js'
-import { Chart } from 'react-chartjs-2'
-import { faker } from '@faker-js/faker'
+import { Bar, Line } from 'react-chartjs-2'
+import dayjs from 'libs/utils/dayjsConfig'
 import type { Dayjs } from 'dayjs'
-import { useEffect, useRef, useState } from 'react'
-import { Spin } from 'antd'
+import { useEffect, useState } from 'react'
+import { Spin, Tabs } from 'antd'
 import colors from 'tailwindcss/colors'
 import { useTranslation } from 'react-i18next'
-import { getColorForValue } from 'libs/utils/helper'
+import { getColorForValue, translateColor } from 'libs/utils/helper'
 import { airColorMap } from 'libs/utils/constant'
 
 ChartJS.register(
@@ -36,87 +36,25 @@ ChartJS.register(
   BarController
 )
 
-const labels = Array.from({ length: 24 }, (_, i) => `${i.toString().padStart(2, '0')}:00`)
-
-const defaultChartOptions = {
+const commonChartOptions = {
   responsive: true,
   maintainAspectRatio: false,
   interaction: {
     mode: 'index' as const,
     intersect: false
   },
-  stacked: true,
-  plugins: {
-    legend: {
-      display: true,
-      position: 'top',
-      size: {
-        height: 20,
-        width: 20
-      },
-      backgroundColor: colors.gray[100]
-    },
-    title: {
-      display: true,
-      text: 'Average Traffic and Air Quality Index by Hour'
-    },
-    datalabels: {
-      display: true,
-      color: colors.gray[900],
-      align: 'end',
-      anchor: 'end'
-    }
-  },
   scales: {
     y: {
       type: 'linear' as const,
       display: true,
       position: 'left' as const,
-      tilte: {
-        display: true,
-        text: 'Air Quality Index'
-      }
-    },
-    y1: {
-      type: 'linear' as const,
-      display: true,
-      position: 'right' as const,
-      grid: {
-        drawOnChartArea: false
-      },
-      ticks: {
-        beginAtZero: true,
-        max: 100
-      },
       title: {
         display: true,
-        text: 'Traffic Quality Index'
+        text: 'Quality Index'
       }
     }
   }
-} as ChartOptions<'bar'>
-
-export const data = {
-  labels,
-  datasets: [
-    {
-      type: 'line' as const,
-      label: 'Traffic Quality Index',
-      borderColor: 'rgb(255, 99, 132)',
-      borderWidth: 2,
-      fill: false,
-      data: labels.map(() => faker.number.int({ min: 0, max: 500 }))
-    },
-    {
-      type: 'bar' as const,
-      label: 'Air Quality Index',
-      backgroundColor: 'rgb(75, 192, 192)',
-      data: labels.map(() => faker.number.int({ min: 0, max: 500 })),
-      borderColor: 'white',
-      borderWidth: 2
-    }
-  ]
-} as ChartData<'bar'>
+}
 
 interface CombineChartProps {
   location: string
@@ -135,11 +73,39 @@ const trafficColorMap = [
   { range: [26, 9999] as [number, number], color: colors.cyan[700] }
 ]
 
+type colorMapType = { range: [number, number]; color: string }
+
+const getColorByTime = (
+  value: number,
+  getColorForValueHandler: (value: number, colorMap: colorMapType[]) => string,
+  colorMap: colorMapType[],
+  startDate?: Dayjs,
+  label?: string
+) => {
+  const color = getColorForValueHandler(value, colorMap)
+  if (!startDate && !label) {
+    return color
+  }
+  if (dayjs().isBefore(startDate, 'day')) {
+    return translateColor(color, -0.5)
+  }
+  if (label?.includes(':') && label > dayjs().format('HH:mm')) {
+    return translateColor(color, -0.5)
+  }
+  return color
+}
+
 export const CombineChart = ({ location, rawData, labels, startDate, endDate }: CombineChartProps) => {
-  const [chartData, setChartData] = useState<ChartData<'bar' | 'line'>>(data)
-  const [chartOptions, setChartOptions] = useState<ChartOptions<'bar'>>(defaultChartOptions)
+  const [chartTrafficData, setChartTrafficData] = useState<ChartData<'bar'>>()
+  const [chartAirData, setChartAirData] = useState<ChartData<'line'>>()
+  // const [chartOptions, setChartOptions] = useState<ChartOptions<'bar' | 'line'>>(defaultChartOptions)
+  const [airChartOptions, setAirChartOptions] = useState<ChartOptions<'line'>>(
+    commonChartOptions as ChartOptions<'line'>
+  )
+  const [trafficChartOptions, setTrafficChartOptions] = useState<ChartOptions<'bar'>>(
+    commonChartOptions as ChartOptions<'bar'>
+  )
   const [loading, setLoading] = useState(false)
-  const chartRef = useRef(null)
   const { t } = useTranslation()
 
   useEffect(() => {
@@ -152,9 +118,12 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
           pointRadius: 4,
           borderColor: colors.slate[400],
           borderDash: [5, 5],
+          pointBorderColor: (context: { raw: number; dataIndex: number; chart: { data: { labels: string[] } } }) => {
+            const label = context.chart.data.labels[context.dataIndex]
+            const color = getColorByTime(context.raw, getColorForValue, airColorMap, startDate, label)
+            return color
+          },
           pointBackgroundColor: (context: { raw: number }) =>
-            context.raw ? getColorForValue(context.raw, airColorMap) : 'transparent',
-          pointBorderColor: (context: { raw: number }) =>
             context.raw ? getColorForValue(context.raw, airColorMap) : 'transparent',
           pointBorderWidth: 2,
           pointHoverBorderColor: colors.slate[400],
@@ -171,7 +140,13 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
           label: t('traffic'),
           backgroundColor: (context: { raw: number }) =>
             context.raw ? getColorForValue(context.raw, trafficColorMap) : 'black',
-          hoverBorderColor: colors.blue[600],
+          borderColor: (context: { raw: number; dataIndex: number; chart: { data: { labels: string[] } } }) => {
+            const label = context.chart.data.labels[context.dataIndex]
+            const color = getColorByTime(context.raw, getColorForValue, trafficColorMap, startDate, label)
+            return color
+          },
+          hoverBackgroundColor: colors.cyan[700],
+          hoverBorderColor: colors.indigo[700],
           transitions: {
             duration: 1000,
             easing: 'easeInOutCubic'
@@ -180,15 +155,12 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
           yAxisID: 'y1'
         } as ChartData<'bar'>['datasets'][0]
 
-        setChartData({
-          labels,
-          datasets: [airQualityDataset, trafficDataset]
-        })
+        setChartAirData({ labels, datasets: [airQualityDataset] })
+        setChartTrafficData({ labels, datasets: [trafficDataset] })
 
-        setChartOptions({
-          ...defaultChartOptions,
+        setAirChartOptions({
+          ...commonChartOptions,
           plugins: {
-            ...defaultChartOptions.plugins,
             title: {
               display: true,
               text: `${location ?? 'Ba Tháng Hai - Sư Vạn Hạnh'} ${startDate.format('DD/MM/YYYY')}${endDate.isSame(startDate, 'day') ? '' : `-${endDate.format('DD/MM/YYYY')}`}`
@@ -196,16 +168,28 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
           },
           scales: {
             y: {
-              ...defaultChartOptions.scales?.y,
+              ...commonChartOptions.scales?.y,
               suggestedMax:
                 Math.max(...rawData.map((item: TrafficAirData) => item.air_data?.air_quality_index ?? 0)) * 1.3,
               title: {
                 display: true,
                 text: t('air_quality_index')
               }
-            },
+            }
+          }
+        })
+
+        setTrafficChartOptions({
+          ...commonChartOptions,
+          plugins: {
+            title: {
+              display: true,
+              text: `${location ?? 'Ba Tháng Hai - Sú Vạn Hạnh'} ${startDate.format('DD/MM/YYYY')}${endDate.isSame(startDate, 'day') ? '' : `-${endDate.format('DD/MM/YYYY')}`}`
+            }
+          },
+          scales: {
             y1: {
-              ...defaultChartOptions.scales?.y1,
+              ...commonChartOptions.scales?.y,
               suggestedMax:
                 Math.max(...rawData.map((item: TrafficAirData) => item.traffic_data?.traffic_quality_index ?? 0)) * 1.3,
               title: {
@@ -227,13 +211,14 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
   return (
     <div className="h-[20rem] w-full rounded-md border border-gray-200 md:h-[36.5rem] lg:col-span-8">
       <Spin spinning={loading} tip={t('loading...')} fullscreen />
-      <Chart
-        ref={chartRef}
-        type="bar"
-        data={chartData as ChartData<'bar'>}
-        options={chartOptions}
-        className="h-full w-full"
-      />
+      <Tabs tabPosition="left" style={{ height: '100%' }} tabBarStyle={{ height: '100%' }} centered>
+        <Tabs.TabPane tab="Air Quality" key="air" className="h-[20rem] md:h-[36.5rem]" id="air-tab">
+          <Line data={chartAirData || { labels: [], datasets: [] }} options={airChartOptions} />
+        </Tabs.TabPane>
+        <Tabs.TabPane tab="Traffic" key="traffic" className="h-[20rem] md:h-[36.5rem]" id="traffic-tab">
+          <Bar data={chartTrafficData || { labels: [], datasets: [] }} options={trafficChartOptions} />
+        </Tabs.TabPane>
+      </Tabs>
     </div>
   )
 }
