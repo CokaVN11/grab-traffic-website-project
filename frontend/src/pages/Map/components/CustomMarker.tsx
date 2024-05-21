@@ -30,9 +30,7 @@ export const CustomMarker: React.FC<CustomMarkerProps> = ({
         }
         onClick(locationID, lng, lat)
       }}>
-      <div
-        className="disappearing-appearing-div flex flex-col items-center justify-center"
-        style={{ animationDelay: `${animationDelay}s` }}>
+      <div className="flex flex-col items-center justify-center" style={{ animationDelay: `${animationDelay}s` }}>
         <div
           className={`flex h-8 w-8 translate-y-5 items-center justify-center rounded-full border border-white border-opacity-45 bg-opacity-80`}
           style={{

@@ -55,8 +55,3 @@
     visibility: visible;
   }
 }
-
-.disappearing-appearing-div {
-  animation: grow-up 16s infinite ease-in-out;
-  transform-origin: bottom;
-}

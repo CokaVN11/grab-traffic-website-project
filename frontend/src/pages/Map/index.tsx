@@ -3,7 +3,7 @@ import { Map, MapRef, Source, Layer } from 'react-map-gl'
 import { useAppDispatch, setShowDetails, useAppSelector, useInitEnvironData } from 'libs/redux'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import './index.css'
-import { Spin, Switch, Tooltip } from 'antd'
+import { AutoComplete, Spin, Switch, Tooltip } from 'antd'
 import { distance, point } from '@turf/turf'
 import { setCurrentAirData, setCurrentLocationID, setCurrentTrafficData } from 'libs/redux/sliceData'
 import { trafficLayer } from './components/layers'
@@ -59,6 +59,7 @@ export const MapPage = () => {
     very_unhealthy: 0,
     hazardous: 0
   })
+  const [options, setOptions] = useState<{ value: string }[]>([])
   const dispatch = useAppDispatch()
   const { t } = useTranslation()
   const { filters, toggleFilter } = useAirQualityFilters()
@@ -68,6 +69,7 @@ export const MapPage = () => {
   useEffect(() => {
     if (locations.length > 0) {
       setHasData(true)
+      setOptions(locations.map((loc) => ({ value: loc.place })))
       const qualityCounts = locations.reduce(
         (counts, item) => {
           const index = item.air_quality_index as number
@@ -129,9 +131,40 @@ export const MapPage = () => {
 
   const airQualityKeys = Object.keys(airQualityConfig) as (keyof typeof airQualityConfig)[]
 
+  const searchHandler = (searchText: string) => {
+    const filtered = locations
+      .filter((location) => location.place.toLowerCase().includes(searchText.toLowerCase()))
+      .slice(0, 5)
+    setOptions(filtered.map((loc) => ({ value: loc.place })))
+  }
+
+  const selectHandler = (selectedPlace: string) => {
+    const selectedLocation = locations.find((location) => location.place === selectedPlace)
+    if (selectedLocation) {
+      zoomToDistrict(
+        parseFloat(selectedLocation.long ?? '10.770496918'),
+        parseFloat(selectedLocation.lat ?? '106.692330564')
+      )
+      dispatch(setShowDetails({ showDetails: true, district: selectedLocation.place }))
+      dispatch(setCurrentLocationID(parseInt(selectedLocation.id.toString())))
+      dispatch(setCurrentAirData(undefined))
+      dispatch(setCurrentTrafficData(undefined))
+    }
+  }
+
   return (
     <div className="flex h-full w-full flex-1">
       <Spin spinning={isLoading && isStyleLoaded} fullscreen size="large" tip={t('loading...')} />
+      <div className="absolute left-0 top-0 z-10 ml-4 mt-20">
+        <AutoComplete
+          options={options}
+          className="w-96"
+          onChange={searchHandler}
+          onSelect={selectHandler}
+          defaultValue={options[0]?.value}
+          placeholder={t('enter_location')}
+        />
+      </div>
       <Map
         ref={mapRef}
         mapboxAccessToken={mapboxToken}
