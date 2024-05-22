@@ -9,9 +9,9 @@ interface SpinningProgressProps {
 }
 
 const conicColors: ProgressProps['strokeColor'] = {
-  '0%': colors.teal[600],
+  '0%': colors.indigo[600],
   '50%': colors.emerald[600],
-  '100%': colors.sky[600]
+  '100%': colors.indigo[600]
 }
 
 const SpinningProgress: React.FC<SpinningProgressProps> = ({ isLoading, children, fullscreen }) => {
