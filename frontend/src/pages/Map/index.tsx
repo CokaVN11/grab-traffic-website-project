@@ -3,7 +3,7 @@ import { Map, MapRef, Source, Layer } from 'react-map-gl'
 import { useAppDispatch, setShowDetails, useAppSelector, useInitEnvironData } from 'libs/redux'
 import 'mapbox-gl/dist/mapbox-gl.css'
 import './index.css'
-import { AutoComplete, Spin, Switch, Tooltip } from 'antd'
+import { AutoComplete, Switch, Tooltip } from 'antd'
 import { distance, point } from '@turf/turf'
 import { setCurrentAirData, setCurrentLocationID, setCurrentTrafficData } from 'libs/redux/sliceData'
 import { trafficLayer } from './components/layers'
@@ -12,6 +12,7 @@ import { useTranslation } from 'react-i18next'
 import colors from 'tailwindcss/colors'
 import { airQualityConfig } from 'libs/utils/constant'
 import { useMediaQuery } from 'react-responsive'
+import SpinningProgress from 'components/SpinningProgress'
 
 const Details = lazy(() => import('components/Details'))
 const CustomMarker = lazy(() => import('./components/CustomMarker'))
@@ -154,7 +155,7 @@ export const MapPage = () => {
 
   return (
     <div className="flex h-full w-full flex-1">
-      <Spin spinning={isLoading && isStyleLoaded} fullscreen size="large" tip={t('loading...')} />
+      <SpinningProgress isLoading={isLoading && isStyleLoaded} fullscreen />
       <div className="absolute left-0 top-0 z-10 ml-4 mt-8 md:mt-24">
         <AutoComplete
           options={options}

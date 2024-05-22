@@ -1,0 +1,12 @@
+/* .ant-spin .ant-spin-dot {
+  width: 0 !important;
+  height: 0 !important;
+  /* margin: -50% 0 0 -50% !important; */
+
+.ant-spin-nested-loading > div > .ant-spin {
+  min-height: 100% !important;
+}
+.ant-spin .ant-spin-dot {
+  width: auto !important;
+  height: auto !important;
+}

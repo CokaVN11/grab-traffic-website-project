@@ -2,8 +2,8 @@ import './App.css'
 import { Navigate, Route, RouterProvider, createBrowserRouter, createRoutesFromElements } from 'react-router-dom'
 import { useInitEnvironData, useInitLocationData } from 'libs/redux'
 import React, { useEffect } from 'react'
-import { Spin } from 'antd'
 import 'flag-icons/css/flag-icons.min.css'
+import SpinningProgress from 'components/SpinningProgress'
 
 // Lazy load pages for better performance
 const RootLayout = React.lazy(() => import('./pages/Layout'))
@@ -43,7 +43,7 @@ const App: React.FC = () => {
   }, [])
 
   return (
-    <React.Suspense fallback={<Spin fullscreen />}>
+    <React.Suspense fallback={<SpinningProgress fullscreen />}>
       <RouterProvider router={router} />
     </React.Suspense>
   )

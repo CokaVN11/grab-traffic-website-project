@@ -1,4 +1,4 @@
-import { AutoComplete, Segmented, Spin } from 'antd'
+import { AutoComplete, Segmented } from 'antd'
 import { Dayjs } from 'dayjs'
 import dayjs from 'libs/utils/dayjsConfig'
 import { lazy, useCallback, useEffect, useState } from 'react'
@@ -16,6 +16,7 @@ import { RootState, useAppSelector } from 'libs/redux'
 import { EnviroService } from 'services/EnviroService'
 import { useTranslation } from 'react-i18next'
 import i18n from '../../i18n'
+import SpinningProgress from 'components/SpinningProgress'
 
 const fetchDailyData = async (location: string, date: string) => {
   const data = await EnviroService.getInstance().getDailyData({ id: location, date })
@@ -129,7 +130,8 @@ export const ChartPage = () => {
 
   return (
     <div className="container grid h-full w-full grid-cols-1 gap-4 py-2 md:grid-cols-12">
-      <Spin spinning={isFetching} fullscreen tip={t('loading...')} />
+      {/* <Spin spinning={isFetching} fullscreen indicator={<Progress type="circle" />} / */}
+      <SpinningProgress isLoading={isFetching} fullscreen />
       {/* Input section */}
       <div className="col-span-full flex flex-col items-center justify-between gap-2 md:flex-row md:gap-0 md:space-x-4">
         <AutoComplete

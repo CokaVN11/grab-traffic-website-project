@@ -1,10 +1,10 @@
-import { Spin } from 'antd'
 import { useAppSelector } from 'libs/redux'
 import { lazy, useEffect, useState } from 'react'
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, ChartData } from 'chart.js'
 import { Doughnut } from 'react-chartjs-2'
 import { useTranslation } from 'react-i18next'
 import colors from 'tailwindcss/colors'
+import SpinningProgress from 'components/SpinningProgress'
 const CustomImage = lazy(() => import('components/CustomImage'))
 
 ChartJS.register(ArcElement, Tooltip, Legend)
@@ -57,7 +57,7 @@ export const Traffic = () => {
   }, [trafficData])
 
   return (
-    <Spin spinning={isLoading} size="large" tip={t('loading...')}>
+    <SpinningProgress isLoading={isLoading}>
       <div className="flex flex-col items-center space-y-4">
         {locationID !== -1 && (
           <CustomImage
@@ -92,7 +92,7 @@ export const Traffic = () => {
           />
         </div>
       </div>
-    </Spin>
+    </SpinningProgress>
   )
 }
 

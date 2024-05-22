@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { RankingService } from 'services/RankingService'
 import { useTranslation } from 'react-i18next'
 import { airColorMap } from 'libs/utils/constant'
+import SpinningProgress from 'components/SpinningProgress'
 
 export const AirRanking = () => {
   const [data, setData] = useState<Ranking[]>([])
@@ -26,14 +27,16 @@ export const AirRanking = () => {
 
     fetchData()
 
-    const interval = setInterval(fetchData, 10000)
+    const interval = setInterval(fetchData, 30000)
 
     return () => clearInterval(interval)
   }, [rankingService])
 
   return (
     <div className="rounded-md border px-2">
-      <RankingBoard ranking={data} options={rankingOptions} />
+      <SpinningProgress isLoading={data.length === 0}>
+        <RankingBoard ranking={data} options={rankingOptions} />
+      </SpinningProgress>
     </div>
   )
 }

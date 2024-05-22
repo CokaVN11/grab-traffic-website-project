@@ -3,6 +3,7 @@ import { RankingBoard } from './RankingBoard'
 import { RankingService } from 'services/RankingService'
 import { useTranslation } from 'react-i18next'
 import colors from 'tailwindcss/colors'
+import SpinningProgress from 'components/SpinningProgress'
 
 export const ChangeRanking = () => {
   const [data, setData] = useState<Ranking[]>([])
@@ -37,7 +38,9 @@ export const ChangeRanking = () => {
 
   return (
     <div className="box-border rounded-md border px-2">
-      <RankingBoard ranking={data} options={rankingOptions} />
+      <SpinningProgress isLoading={data.length === 0}>
+        <RankingBoard ranking={data} options={rankingOptions} />
+      </SpinningProgress>
     </div>
   )
 }

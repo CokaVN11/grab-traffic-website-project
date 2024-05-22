@@ -3,11 +3,12 @@ import { lazy } from 'react'
 const AirRanking = lazy(() => import('./components/AirRanking'))
 const TrafficRanking = lazy(() => import('./components/TrafficRanking'))
 const ChangeRanking = lazy(() => import('./components/ChangeRanking'))
-import { Tabs, Select, Button, TabsProps, theme } from 'antd'
+import { Tabs, Select, Button, TabsProps, theme, Spin } from 'antd'
 import { useTranslation } from 'react-i18next'
 import { setNumberShow, setRankDecrease, useAppDispatch, useAppSelector } from 'libs/redux'
 import { HiOutlineSortDescending, HiOutlineSortAscending } from 'react-icons/hi'
 import StickyBox from 'react-sticky-box'
+import React from 'react'
 
 const { Option } = Select
 
@@ -72,13 +73,19 @@ export const RankingPage = () => {
       {!isMobile ? (
         <Tabs defaultActiveKey="air" centered size="large" renderTabBar={CustomTabBar} className="flex">
           <Tabs.TabPane tab={t('air_quality')} key="air">
-            <AirRanking />
+            <React.Suspense fallback={<Spin tip={t('loading')} fullscreen />}>
+              <AirRanking />
+            </React.Suspense>
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('traffic')} key="traffic">
-            <TrafficRanking />
+            <React.Suspense fallback={<Spin tip={t('loading')} fullscreen />}>
+              <TrafficRanking />
+            </React.Suspense>
           </Tabs.TabPane>
           <Tabs.TabPane tab={t('change')} key="change">
-            <ChangeRanking />
+            <React.Suspense fallback={<Spin tip={t('loading')} fullscreen />}>
+              <ChangeRanking />
+            </React.Suspense>
           </Tabs.TabPane>
         </Tabs>
       ) : (

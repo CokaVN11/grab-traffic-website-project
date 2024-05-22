@@ -9,11 +9,12 @@ import {
   useInitEnvironData
 } from 'libs/redux'
 import { FaChevronRight } from 'react-icons/fa'
-import { Spin, Tabs, TabsProps, theme } from 'antd'
+import { Tabs, TabsProps, theme } from 'antd'
 import { useMediaQuery } from 'react-responsive'
 import StickyBox from 'react-sticky-box'
 import dayjs from 'libs/utils/dayjsConfig'
 import { useTranslation } from 'react-i18next'
+import SpinningProgress from 'components/SpinningProgress'
 
 const AirQuality = lazy(() => import('./AirQuality'))
 const Weather = lazy(() => import('./Weather'))
@@ -74,10 +75,10 @@ export const Details: React.FC = () => {
       label: t('air_quality'),
       children: (
         <CustomTabPane key="airq">
-          <Spin spinning={isLoading} size="large" tip={t('loading...')}>
+          <SpinningProgress isLoading={isLoading}>
             <AirQuality />
             <Weather />
-          </Spin>
+          </SpinningProgress>
         </CustomTabPane>
       )
     },
