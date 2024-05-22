@@ -37,7 +37,7 @@ export const DateInput: React.FC<DateInputProps> = ({
       onCalendarChange={onChange}
       disabledDate={disableDate}
       defaultValue={defaultPickerDate}
-      maxDate={dayjs().add(7, 'day')}
+      maxDate={dayjs()}
     />
   ) : (
     <DatePicker

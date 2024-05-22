@@ -155,7 +155,7 @@ export const MapPage = () => {
   return (
     <div className="flex h-full w-full flex-1">
       <Spin spinning={isLoading && isStyleLoaded} fullscreen size="large" tip={t('loading...')} />
-      <div className="md:mt-22 absolute left-0 top-0 z-10 ml-4 mt-8">
+      <div className="absolute left-0 top-0 z-10 ml-4 mt-8 md:mt-24">
         <AutoComplete
           options={options}
           className="h-10 w-96"
