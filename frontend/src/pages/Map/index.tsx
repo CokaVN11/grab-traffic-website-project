@@ -155,10 +155,10 @@ export const MapPage = () => {
   return (
     <div className="flex h-full w-full flex-1">
       <Spin spinning={isLoading && isStyleLoaded} fullscreen size="large" tip={t('loading...')} />
-      <div className="absolute left-0 top-0 z-10 ml-4 mt-20">
+      <div className="md:mt-22 absolute left-0 top-0 z-10 ml-4 mt-8">
         <AutoComplete
           options={options}
-          className="w-96"
+          className="h-10 w-96"
           onChange={searchHandler}
           onSelect={selectHandler}
           defaultValue={options[0]?.value}

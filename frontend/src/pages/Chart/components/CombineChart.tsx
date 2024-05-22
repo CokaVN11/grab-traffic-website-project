@@ -22,6 +22,9 @@ import colors from 'tailwindcss/colors'
 import { useTranslation } from 'react-i18next'
 import { getColorForValue, translateColor } from 'libs/utils/helper'
 import { airColorMap } from 'libs/utils/constant'
+import { useMediaQuery } from 'react-responsive'
+import './CombineChart.css'
+import { FaCar, FaWind } from 'react-icons/fa'
 
 ChartJS.register(
   CategoryScale,
@@ -89,16 +92,28 @@ const getColorByTime = (
   if (dayjs().isBefore(startDate, 'day')) {
     return translateColor(color, -0.5)
   }
-  if (label?.includes(':') && label > dayjs().format('HH:mm')) {
-    return translateColor(color, -0.5)
+  if (dayjs().isSame(startDate, 'day')) {
+    if (label?.includes(':') && label > dayjs().format('HH:mm')) {
+      return translateColor(color, -0.5)
+    }
   }
+
   return color
+}
+
+const TabLabel = ({ leadingIcon, label }: { leadingIcon: React.ReactNode; label: string }) => {
+  const isMobile = useMediaQuery({ query: '(max-width: 768px)' })
+  return (
+    <div className="flex items-center">
+      {leadingIcon}
+      <span className={`ml-2 ${isMobile ? 'hidden' : ''}`}>{label}</span>
+    </div>
+  )
 }
 
 export const CombineChart = ({ location, rawData, labels, startDate, endDate }: CombineChartProps) => {
   const [chartTrafficData, setChartTrafficData] = useState<ChartData<'bar'>>()
   const [chartAirData, setChartAirData] = useState<ChartData<'line'>>()
-  // const [chartOptions, setChartOptions] = useState<ChartOptions<'bar' | 'line'>>(defaultChartOptions)
   const [airChartOptions, setAirChartOptions] = useState<ChartOptions<'line'>>(
     commonChartOptions as ChartOptions<'line'>
   )
@@ -120,8 +135,7 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
           borderDash: [5, 5],
           pointBorderColor: (context: { raw: number; dataIndex: number; chart: { data: { labels: string[] } } }) => {
             const label = context.chart.data.labels[context.dataIndex]
-            const color = getColorByTime(context.raw, getColorForValue, airColorMap, startDate, label)
-            return color
+            return getColorByTime(context.raw, getColorForValue, airColorMap, startDate, label)
           },
           pointBackgroundColor: (context: { raw: number }) =>
             context.raw ? getColorForValue(context.raw, airColorMap) : 'transparent',
@@ -145,8 +159,8 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
             const color = getColorByTime(context.raw, getColorForValue, trafficColorMap, startDate, label)
             return color
           },
+          borderWidth: 2,
           hoverBackgroundColor: colors.cyan[700],
-          hoverBorderColor: colors.indigo[700],
           transitions: {
             duration: 1000,
             easing: 'easeInOutCubic'
@@ -211,11 +225,22 @@ export const CombineChart = ({ location, rawData, labels, startDate, endDate }: 
   return (
     <div className="h-[20rem] w-full rounded-md border border-gray-200 md:h-[36.5rem] lg:col-span-8">
       <Spin spinning={loading} tip={t('loading...')} fullscreen />
-      <Tabs tabPosition="left" style={{ height: '100%' }} tabBarStyle={{ height: '100%' }} centered>
-        <Tabs.TabPane tab="Air Quality" key="air" className="h-[20rem] md:h-[36.5rem]" id="air-tab">
+      <Tabs tabPosition="left" style={{ height: '100%' }} centered>
+        <Tabs.TabPane
+          tab={TabLabel({
+            leadingIcon: <FaWind />,
+            label: t('air_quality')
+          })}
+          key="air"
+          className="h-[20rem] md:h-[36.5rem]"
+          id="air-tab">
           <Line data={chartAirData || { labels: [], datasets: [] }} options={airChartOptions} />
         </Tabs.TabPane>
-        <Tabs.TabPane tab="Traffic" key="traffic" className="h-[20rem] md:h-[36.5rem]" id="traffic-tab">
+        <Tabs.TabPane
+          tab={TabLabel({ leadingIcon: <FaCar />, label: t('traffic') })}
+          key="traffic"
+          className="h-[20rem] md:h-[36.5rem]"
+          id="traffic-tab">
           <Bar data={chartTrafficData || { labels: [], datasets: [] }} options={trafficChartOptions} />
         </Tabs.TabPane>
       </Tabs>
