@@ -34,9 +34,15 @@ export const AirQuality = () => {
         .getWeatherData(currentLocationID.toString())
         .then((data) => {
           setWeatherText(data.WeatherText ?? 'Có nắng')
-          setTemperature(data.Temperature.Metric.Value ?? '32')
-          setHumidity(data.RelativeHumidity ?? '80')
-          setWindSpeed(data.Wind.Speed.Metric.Value ?? '3')
+          setTemperature(data.Temperature.Metric.Value ?? 32)
+          setHumidity(data.RelativeHumidity ?? 80)
+          setWindSpeed(data.Wind.Speed.Metric.Value ?? 3)
+        })
+        .catch((_) => {
+          setWeatherText('Có nắng')
+          setTemperature(32)
+          setHumidity(80)
+          setWindSpeed(3)
         })
     }
   }, [currentLocationID, lat, long])
