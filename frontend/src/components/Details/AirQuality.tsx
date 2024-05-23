@@ -33,10 +33,10 @@ export const AirQuality = () => {
       EnviroService.getInstance()
         .getWeatherData(currentLocationID.toString())
         .then((data) => {
-          setWeatherText(data.WeatherText)
-          setTemperature(data.Temperature.Metric.Value)
-          setHumidity(data.RelativeHumidity)
-          setWindSpeed(data.Wind.Speed.Metric.Value)
+          setWeatherText(data.WeatherText ?? 'Có nắng')
+          setTemperature(data.Temperature.Metric.Value ?? '32')
+          setHumidity(data.RelativeHumidity ?? '80')
+          setWindSpeed(data.Wind.Speed.Metric.Value ?? '3')
         })
     }
   }, [currentLocationID, lat, long])
